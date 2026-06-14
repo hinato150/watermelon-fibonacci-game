@@ -1,124 +1,127 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { GameOverScreen } from './components/GameOverScreen';
 import { StartScreen } from './components/StartScreen';
+import { CURSOR_STEP } from './game/constants';
 import {
-  CANVAS_HEIGHT,
-  CANVAS_WIDTH,
-  ENEMY_SIZE,
-  PLAYER_SIZE,
-} from './game/constants';
+  createInitialGameState,
+  dropCurrentBlock,
+  moveCursor,
+  restartGame,
+  setCursorPosition,
+  startGame,
+  updateGameState,
+} from './game/update';
 import type { GameState } from './game/types';
-import { updateGameState, type InputState } from './game/update';
 
-const initialGameState: GameState = {
-  status: 'start',
-  score: 0,
-  player: {
-    position: {
-      x: CANVAS_WIDTH / 2 - PLAYER_SIZE / 2,
-      y: CANVAS_HEIGHT / 2 - PLAYER_SIZE / 2,
-    },
-    size: PLAYER_SIZE,
-  },
-  enemies: [
-    {
-      position: {
-        x: 100,
-        y: 100,
-      },
-      size: ENEMY_SIZE,
-    },
-  ],
-};
+const BEST_SCORE_KEY = 'fibo-drop-best-score';
 
-const initialInputState: InputState = {
-  up: false,
-  down: false,
-  left: false,
-  right: false,
-};
+function readBestScore() {
+  const stored = window.localStorage.getItem(BEST_SCORE_KEY);
+  const parsed = stored ? Number(stored) : 0;
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function App() {
-  const [gameState, setGameState] = useState<GameState>(initialGameState);
-  const [inputState, setInputState] = useState<InputState>(initialInputState);
+  const [gameState, setGameState] = useState<GameState>(() =>
+    createInitialGameState(readBestScore()),
+  );
 
-  function startGame() {
-    setGameState({
-      ...initialGameState,
-      status: 'playing',
-      score: 0,
-    });
-  }
+  useEffect(() => {
+    window.localStorage.setItem(BEST_SCORE_KEY, String(gameState.bestScore));
+  }, [gameState.bestScore]);
+
+  const tick = useEffectEvent((deltaMs: number) => {
+    setGameState((current) => updateGameState(current, deltaMs));
+  });
+
+  useEffect(() => {
+    if (gameState.status !== 'playing') {
+      return;
+    }
+
+    let frameId = 0;
+    let lastTime = performance.now();
+
+    function loop(now: number) {
+      tick(now - lastTime);
+      lastTime = now;
+      frameId = window.requestAnimationFrame(loop);
+    }
+
+    frameId = window.requestAnimationFrame(loop);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [gameState.status]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      setInputState((current) => ({
-        ...current,
-        up: event.key === 'ArrowUp' || event.key === 'w' ? true : current.up,
-        down:
-          event.key === 'ArrowDown' || event.key === 's'
-            ? true
-            : current.down,
-        left:
-          event.key === 'ArrowLeft' || event.key === 'a'
-            ? true
-            : current.left,
-        right:
-          event.key === 'ArrowRight' || event.key === 'd'
-            ? true
-            : current.right,
-      }));
-    }
+      if (event.repeat && event.code === 'Space') {
+        return;
+      }
 
-    function handleKeyUp(event: KeyboardEvent) {
-      setInputState((current) => ({
-        ...current,
-        up: event.key === 'ArrowUp' || event.key === 'w' ? false : current.up,
-        down:
-          event.key === 'ArrowDown' || event.key === 's'
-            ? false
-            : current.down,
-        left:
-          event.key === 'ArrowLeft' || event.key === 'a'
-            ? false
-            : current.left,
-        right:
-          event.key === 'ArrowRight' || event.key === 'd'
-            ? false
-            : current.right,
-      }));
+      if (gameState.status === 'start' && event.code === 'Space') {
+        setGameState((current) => startGame(current.bestScore));
+        return;
+      }
+
+      if (gameState.status === 'gameOver') {
+        if (event.code === 'Space' || event.key.toLowerCase() === 'r') {
+          setGameState((current) => restartGame(current));
+        }
+        return;
+      }
+
+      if (gameState.status !== 'playing') {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (event.code === 'Space') {
+        event.preventDefault();
+        setGameState((current) => dropCurrentBlock(current));
+        return;
+      }
+
+      if (key === 'arrowleft' || key === 'a') {
+        setGameState((current) => moveCursor(current, -CURSOR_STEP));
+      } else if (key === 'arrowright' || key === 'd') {
+        setGameState((current) => moveCursor(current, CURSOR_STEP));
+      } else if (key === 'r') {
+        setGameState((current) => restartGame(current));
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
-
-  useEffect(() => {
-    const timerId = window.setInterval(() => {
-      setGameState((current) => updateGameState(current, inputState));
-    }, 16);
-
-    return () => {
-      window.clearInterval(timerId);
-    };
-  }, [inputState]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.status]);
 
   return (
     <main className="app">
-      {gameState.status === 'start' && <StartScreen onStart={startGame} />}
+      {gameState.status === 'start' && (
+        <StartScreen onStart={() => setGameState((current) => startGame(current.bestScore))} />
+      )}
 
       {gameState.status === 'playing' && (
-        <GameCanvas gameState={gameState} />
+        <GameCanvas
+          gameState={gameState}
+          onDrop={() => setGameState((current) => dropCurrentBlock(current))}
+          onMoveCursor={(x) =>
+            setGameState((current) => setCursorPosition(current, x))
+          }
+        />
       )}
 
       {gameState.status === 'gameOver' && (
-        <GameOverScreen score={gameState.score} onRetry={startGame} />
+        <GameOverScreen
+          score={gameState.score}
+          bestScore={gameState.bestScore}
+          highestValue={gameState.highestValue}
+          onRetry={() => setGameState((current) => restartGame(current))}
+        />
       )}
     </main>
   );

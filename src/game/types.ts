@@ -1,23 +1,28 @@
-export type Position = {
+export type GameStatus = 'start' | 'playing' | 'gameOver';
+
+export type BlockValue = number;
+
+export type Block = {
+  id: number;
+  value: BlockValue;
+  size: number;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
+  isActive: boolean;
+  mergeLockMs: number;
 };
-
-export type Player = {
-  position: Position;
-  size: number;
-};
-
-export type Enemy = {
-  position: Position;
-  size: number;
-};
-
-export type GameStatus = 'start' | 'playing' | 'gameOver';
 
 export type GameState = {
   status: GameStatus;
   score: number;
-  player: Player;
-  enemies: Enemy[];
+  bestScore: number;
+  highestValue: BlockValue;
+  currentValue: BlockValue;
+  nextValue: BlockValue;
+  cursorX: number;
+  blocks: Block[];
+  warningMs: number;
+  nextBlockId: number;
 };

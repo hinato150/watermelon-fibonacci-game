@@ -2,65 +2,281 @@
   box-sizing: border-box;
 }
 
+:root {
+  color: #fdf8f1;
+  font-family: "Trebuchet MS", "Hiragino Kaku Gothic ProN", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 215, 140, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 20%, rgba(129, 194, 143, 0.12), transparent 24%),
+    linear-gradient(180deg, #243126 0%, #1d2520 32%, #151716 100%);
+}
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  background: #111827;
-  color: white;
+  min-width: 320px;
+  min-height: 100vh;
 }
 
 button {
   font: inherit;
   cursor: pointer;
-  border: none;
+  border: 0;
   border-radius: 999px;
-  padding: 12px 24px;
-  background: white;
-  color: #111827;
-  font-weight: 700;
+  padding: 14px 26px;
+  color: #223126;
+  background: linear-gradient(135deg, #f4dea1, #d8b15a);
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgba(216, 177, 90, 0.24);
 }
 
 .app {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 24px 16px;
+}
+
+.screen,
+.game-shell {
+  width: min(100%, 480px);
 }
 
 .screen {
-  width: min(480px, 100%);
+  padding: 32px 28px;
+  border: 1px solid rgba(255, 241, 224, 0.12);
+  border-radius: 28px;
+  background: rgba(25, 33, 29, 0.88);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
   text-align: center;
-  background: #1f2937;
-  border-radius: 24px;
-  padding: 40px;
 }
 
-.game {
+.screen h1 {
+  margin: 0 0 12px;
+  font-size: clamp(36px, 8vw, 52px);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #e8c97b;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.screen p {
+  margin: 0;
+  color: rgba(253, 248, 241, 0.84);
+  line-height: 1.6;
+}
+
+.screen-actions {
+  margin-top: 24px;
+}
+
+.screen-note {
+  margin-top: 18px;
+  font-size: 14px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.result-grid div,
+.hud-card,
+.status-row,
+.caption {
+  border: 1px solid rgba(255, 241, 224, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.result-grid div {
+  border-radius: 18px;
+  padding: 16px 12px;
+}
+
+.result-grid span,
+.score-stack span,
+.queue-item span {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 248, 241, 0.62);
+}
+
+.result-grid strong,
+.score-stack strong,
+.queue-item strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
+}
+
+.hud-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+}
+
+.score-stack,
+.queue-stack {
   display: grid;
   gap: 12px;
 }
 
-.hud {
-  font-size: 24px;
-  font-weight: 700;
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14px;
 }
 
-.game-area {
+.game-board {
   position: relative;
+  height: 640px;
+  margin-top: 12px;
   overflow: hidden;
-  background: #0f172a;
-  border: 4px solid white;
-  border-radius: 16px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 241, 224, 0.1);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(231, 210, 157, 0.18), transparent 0 130px),
+    radial-gradient(circle at 68% 66%, rgba(205, 170, 85, 0.12), transparent 0 140px),
+    linear-gradient(180deg, rgba(240, 228, 191, 0.08) 0, rgba(240, 228, 191, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(240, 228, 191, 0.05) 0, rgba(240, 228, 191, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #49604d 0%, #2f4133 42%, #1d2920 100%);
+  background-size: cover, cover, 100% 40px, 40px 100%, cover;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  touch-action: none;
 }
 
-.player {
+.danger-band {
   position: absolute;
-  background: #38bdf8;
-  border-radius: 8px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  border-top: 2px dashed rgba(255, 115, 115, 0.85);
+  pointer-events: none;
 }
 
-.enemy {
+.danger-band span {
   position: absolute;
-  background: #f97316;
+  top: -12px;
+  right: 16px;
+  padding: 2px 10px;
   border-radius: 999px;
+  background: rgba(255, 115, 115, 0.16);
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.danger-progress {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.25), rgba(239, 68, 68, 0.58));
+}
+
+.block,
+.preview-block {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: #213026;
+  font-weight: 900;
+  user-select: none;
+  box-shadow:
+    inset 0 -10px 18px rgba(255, 255, 255, 0.22),
+    0 12px 18px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.block::before,
+.preview-block::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.preview-block {
+  opacity: 0.92;
+  border: 2px dashed rgba(44, 29, 32, 0.22);
+}
+
+.preview-block.is-faded {
+  opacity: 0.38;
+}
+
+.drop-hint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 45%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.drop-hint.is-ready {
+  opacity: 0.9;
+}
+
+.caption {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  text-align: center;
+  color: rgba(253, 248, 241, 0.74);
+  font-size: 14px;
+}
+
+.sequence-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sequence-row span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 241, 224, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  color: rgba(253, 248, 241, 0.82);
+}
+
+@media (max-width: 560px) {
+  .screen,
+  .game-shell {
+    width: 100%;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hud-card,
+  .status-row {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .game-board {
+    height: min(640px, calc(100vh - 240px));
+  }
 }
