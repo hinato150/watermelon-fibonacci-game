@@ -1,3 +1,5 @@
+import appIcon from '../icon.png';
+
 type StartScreenProps = {
   onStart: () => void;
 };
@@ -5,6 +7,7 @@ type StartScreenProps = {
 export function StartScreen({ onStart }: StartScreenProps) {
   return (
     <section className="screen">
+      <img className="screen-logo" src={appIcon} alt="フィボドロップ" />
       <p className="eyebrow">Prototype 0.1</p>
       <h1>フィボドロップ</h1>
       <p>

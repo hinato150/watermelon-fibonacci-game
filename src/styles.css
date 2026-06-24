@@ -53,6 +53,8 @@ button {
 .screen,
 .game-shell {
   width: min(100%, 420px);
+  min-width: 0;
+  max-width: 420px;
 }
 
 .screen {
@@ -67,6 +69,14 @@ button {
     0 0 36px rgba(0, 246, 255, 0.18),
     0 22px 70px rgba(0, 0, 0, 0.5);
   text-align: center;
+}
+
+.screen-logo {
+  display: block;
+  width: min(100%, 280px);
+  margin: -4px auto 14px;
+  border-radius: 14px;
+  filter: drop-shadow(0 0 18px rgba(0, 246, 255, 0.42)) drop-shadow(0 0 16px rgba(255, 43, 214, 0.26));
 }
 
 .screen h1 {
@@ -148,10 +158,19 @@ button {
 
 .hud-card {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 18px;
   border-radius: 8px;
+}
+
+.hud-logo {
+  width: 118px;
+  max-width: 30%;
+  border-radius: 10px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(0, 246, 255, 0.35));
 }
 
 .score-stack,
@@ -172,11 +191,18 @@ button {
   font-size: 13px;
 }
 
+.board-frame {
+  position: relative;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  max-width: 100%;
+}
+
 .game-board {
   position: relative;
   width: 420px;
   height: 640px;
-  margin-top: 12px;
   overflow: hidden;
   border-radius: 8px;
   border: 2px solid rgba(0, 246, 255, 0.46);
@@ -191,6 +217,7 @@ button {
     inset 0 -60px 80px rgba(255, 43, 214, 0.08),
     0 0 34px rgba(0, 246, 255, 0.2);
   touch-action: none;
+  transform-origin: top left;
 }
 
 .game-board::before {
@@ -211,6 +238,7 @@ button {
   border-top: 2px solid #ff2bd6;
   pointer-events: none;
   box-shadow: 0 -1px 12px rgba(255, 43, 214, 0.85);
+  z-index: 5;
 }
 
 .danger-band span {
@@ -313,21 +341,22 @@ button {
   font-size: 14px;
 }
 
-.sequence-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+.mobile-controls {
+  display: none;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
 }
 
-.sequence-row span {
-  padding: 6px 10px;
-  border: 1px solid rgba(248, 255, 77, 0.32);
-  border-radius: 6px;
-  background: rgba(248, 255, 77, 0.08);
-  color: rgba(238, 252, 255, 0.84);
-  font-size: 13px;
-  box-shadow: inset 0 0 12px rgba(248, 255, 77, 0.08);
+.mobile-controls button {
+  min-height: 48px;
+  padding: 10px 12px;
+  font-size: 18px;
+}
+
+.mobile-drop-button {
+  color: #06121b;
+  background: linear-gradient(135deg, #f8ff4d, #00f6ff 62%, #ff2bd6);
 }
 
 .merge-effect {
@@ -343,9 +372,15 @@ button {
 }
 
 @media (max-width: 560px) {
+  .app {
+    align-items: start;
+    padding: 10px 10px 18px;
+  }
+
   .screen,
   .game-shell {
     width: 100%;
+    max-width: calc(100vw - 20px);
   }
 
   .result-grid {
@@ -358,8 +393,29 @@ button {
     flex-direction: column;
   }
 
-  .game-board {
-    width: 100%;
-    height: min(640px, calc(100vh - 240px));
+  .hud-card {
+    padding: 12px;
+  }
+
+  .hud-logo {
+    order: -1;
+    width: 150px;
+    max-width: 64%;
+    margin: 0 auto;
+  }
+
+  .score-stack,
+  .queue-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-controls {
+    display: grid;
+  }
+
+  .caption {
+    margin-top: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
   }
 }
