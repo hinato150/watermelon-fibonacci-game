@@ -19,7 +19,7 @@ export const FIBONACCI_GOAL = 144;
 export const MAX_PREVIEW_SEQUENCE = 8;
 
 export function getBlockSize(value: number) {
-  return Math.min(152, (8 + value) * 2);
+  return Math.min(152, 32 + value ** 0.5 * 25);
 }
 
 export function getBlockColor(value: number) {
