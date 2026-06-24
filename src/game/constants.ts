@@ -5,14 +5,19 @@ export const DANGER_LINE_Y = 92;
 export const GAME_OVER_GRACE_MS = 3000;
 
 export const GRAVITY = 1800;
-export const WALL_BOUNCE = 0.12;
-export const FLOOR_BOUNCE = 0.08;
-export const FRICTION = 0.985;
-export const AIR_DRAG = 0.996;
+export const WALL_BOUNCE = 0.03;
+export const FLOOR_BOUNCE = 0.02;
+export const FRICTION = 0.86;
+export const AIR_DRAG = 0.992;
 export const CURSOR_STEP = 28;
-export const COLLISION_RESTITUTION = 0.18;
-export const COLLISION_PASSES = 6;
-export const MERGE_TOUCH_TOLERANCE = 8;
+export const COLLISION_RESTITUTION = 0.04;
+export const COLLISION_FRICTION = 0.42;
+export const COLLISION_PASSES = 8;
+export const MERGE_TOUCH_TOLERANCE = 4;
+export const RESTING_SPEED = 42;
+export const HORIZONTAL_SLEEP_SPEED = 9;
+export const STACK_FRICTION = 0.78;
+export const MAX_BLOCK_SPEED = 1800;
 
 export const FIBONACCI_START = [1, 2, 3, 5, 8, 13, 21, 34];
 export const FIBONACCI_GOAL = 144;

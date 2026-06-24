@@ -1,4 +1,9 @@
-import { BOARD_HEIGHT, BOARD_WIDTH, COLLISION_RESTITUTION } from './constants';
+import {
+  BOARD_HEIGHT,
+  BOARD_WIDTH,
+  COLLISION_FRICTION,
+  COLLISION_RESTITUTION,
+} from './constants';
 import type { Block } from './types';
 
 function clamp(value: number, min: number, max: number) {
@@ -12,33 +17,36 @@ export function getBlockCenter(block: Block) {
   };
 }
 
+function getBlockRadius(block: Block) {
+  return block.size / 2;
+}
+
+function getBlockMass(block: Block) {
+  return block.size * block.size;
+}
+
 export function getCollisionInfo(first: Block, second: Block) {
   const firstCenter = getBlockCenter(first);
   const secondCenter = getBlockCenter(second);
   const dx = secondCenter.x - firstCenter.x;
   const dy = secondCenter.y - firstCenter.y;
-  const distance = Math.hypot(dx, dy) || 0.0001;
-  const overlapX =
-    Math.min(first.x + first.size, second.x + second.size) -
-    Math.max(first.x, second.x);
-  const overlapY =
-    Math.min(first.y + first.size, second.y + second.size) -
-    Math.max(first.y, second.y);
+  const rawDistance = Math.hypot(dx, dy);
+  const distance = rawDistance || 0.0001;
+  const radiusSum = getBlockRadius(first) + getBlockRadius(second);
 
   return {
     dx,
     dy,
     distance,
-    overlapX,
-    overlapY,
-    normalX: dx / distance,
-    normalY: dy / distance,
+    overlap: radiusSum - rawDistance,
+    normalX: rawDistance === 0 ? 0 : dx / distance,
+    normalY: rawDistance === 0 ? -1 : dy / distance,
   };
 }
 
 export function areBlocksTouching(first: Block, second: Block, tolerance = 0) {
   const info = getCollisionInfo(first, second);
-  return info.overlapX > tolerance && info.overlapY > tolerance;
+  return info.overlap + tolerance > 0;
 }
 
 export function areBlocksCloseEnoughToMerge(
@@ -46,35 +54,26 @@ export function areBlocksCloseEnoughToMerge(
   second: Block,
   distanceTolerance = 4,
 ) {
-  return (
-    first.x < second.x + second.size + distanceTolerance &&
-    first.x + first.size + distanceTolerance > second.x &&
-    first.y < second.y + second.size + distanceTolerance &&
-    first.y + first.size + distanceTolerance > second.y
-  );
+  const info = getCollisionInfo(first, second);
+  return info.overlap + distanceTolerance >= 0;
 }
 
 export function resolveBlockCollision(first: Block, second: Block) {
   const info = getCollisionInfo(first, second);
 
-  if (info.overlapX <= 0 || info.overlapY <= 0) {
+  if (info.overlap <= 0) {
     return 0;
   }
 
-  const totalSize = first.size + second.size;
-  const firstShare = second.size / totalSize;
-  const secondShare = first.size / totalSize;
-  const separation = Math.min(info.overlapX, info.overlapY) + 0.4;
+  const firstInverseMass = 1 / getBlockMass(first);
+  const secondInverseMass = 1 / getBlockMass(second);
+  const inverseMassSum = firstInverseMass + secondInverseMass;
+  const correction = Math.max(0, info.overlap - 0.35) / inverseMassSum;
 
-  if (info.overlapX < info.overlapY) {
-    const direction = info.dx >= 0 ? 1 : -1;
-    first.x -= direction * separation * firstShare;
-    second.x += direction * separation * secondShare;
-  } else {
-    const direction = info.dy >= 0 ? 1 : -1;
-    first.y -= direction * separation * firstShare;
-    second.y += direction * separation * secondShare;
-  }
+  first.x -= info.normalX * correction * firstInverseMass;
+  first.y -= info.normalY * correction * firstInverseMass;
+  second.x += info.normalX * correction * secondInverseMass;
+  second.y += info.normalY * correction * secondInverseMass;
 
   const relativeVelocityX = second.vx - first.vx;
   const relativeVelocityY = second.vy - first.vy;
@@ -82,16 +81,34 @@ export function resolveBlockCollision(first: Block, second: Block) {
     relativeVelocityX * info.normalX + relativeVelocityY * info.normalY;
 
   if (normalVelocity < 0) {
-    const impulse =
-      ((1 + COLLISION_RESTITUTION) * -normalVelocity) /
-      (1 / first.size + 1 / second.size);
-    const impulseX = impulse * info.normalX;
-    const impulseY = impulse * info.normalY;
+    const restitution =
+      Math.abs(normalVelocity) > 180 ? COLLISION_RESTITUTION : 0;
+    const normalImpulse =
+      ((1 + restitution) * -normalVelocity) / inverseMassSum;
+    const impulseX = normalImpulse * info.normalX;
+    const impulseY = normalImpulse * info.normalY;
 
-    first.vx -= impulseX / first.size;
-    first.vy -= impulseY / first.size;
-    second.vx += impulseX / second.size;
-    second.vy += impulseY / second.size;
+    first.vx -= impulseX * firstInverseMass;
+    first.vy -= impulseY * firstInverseMass;
+    second.vx += impulseX * secondInverseMass;
+    second.vy += impulseY * secondInverseMass;
+
+    const tangentX = -info.normalY;
+    const tangentY = info.normalX;
+    const tangentVelocity =
+      relativeVelocityX * tangentX + relativeVelocityY * tangentY;
+    const frictionImpulse = clamp(
+      -tangentVelocity / inverseMassSum,
+      -normalImpulse * COLLISION_FRICTION,
+      normalImpulse * COLLISION_FRICTION,
+    );
+    const frictionX = frictionImpulse * tangentX;
+    const frictionY = frictionImpulse * tangentY;
+
+    first.vx -= frictionX * firstInverseMass;
+    first.vy -= frictionY * firstInverseMass;
+    second.vx += frictionX * secondInverseMass;
+    second.vy += frictionY * secondInverseMass;
   }
 
   first.x = clamp(first.x, 0, BOARD_WIDTH - first.size);

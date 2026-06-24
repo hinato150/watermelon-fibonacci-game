@@ -17,12 +17,12 @@ type GameCanvasProps = {
   onMoveCursor: (x: number) => void;
 };
 
-function PreviewBlock({ value, cursorX, faded }: { value: BlockValue; cursorX: number; faded?: boolean }) {
+function PreviewBlock({ value, cursorX }: { value: BlockValue; cursorX: number }) {
   const size = getBlockSize(value);
 
   return (
     <div
-      className={`block preview-block${faded ? ' is-faded' : ''}`}
+      className="block preview-block"
       style={{
         width: size,
         height: size,
@@ -121,7 +121,6 @@ export function GameCanvas({
         <PreviewBlock
           value={gameState.currentValue}
           cursorX={gameState.cursorX}
-          faded={!dropReady}
         />
 
         {gameState.blocks.map((block) => (
@@ -165,11 +164,7 @@ export function GameCanvas({
         />
       </div>
 
-      <p className="caption">
-        {dropReady
-          ? 'クリック / スペースで落下'
-          : '直前のブロックが少し下がるまで待機'}
-      </p>
+      <p className="caption">クリック / スペースで落下</p>
     </section>
   );
 }

@@ -10,8 +10,12 @@ import {
   FRICTION,
   GAME_OVER_GRACE_MS,
   GRAVITY,
+  HORIZONTAL_SLEEP_SPEED,
+  MAX_BLOCK_SPEED,
   MERGE_TOUCH_TOLERANCE,
+  RESTING_SPEED,
   SPAWN_Y,
+  STACK_FRICTION,
   WALL_BOUNCE,
   getBlockSize,
 } from './constants';
@@ -19,6 +23,7 @@ import {
   areBlocksCloseEnoughToMerge,
   areBlocksTouching,
   getBlockCenter,
+  getCollisionInfo,
   resolveBlockCollision,
 } from './collision';
 import type { Block, BlockValue, Effect, GameState } from './types';
@@ -174,27 +179,14 @@ function separateBlockFromNeighbors(block: Block, neighbors: Block[]) {
 
   for (let pass = 0; pass < 8; pass += 1) {
     for (const neighbor of neighbors) {
-      if (!areBlocksTouching(nextBlock, neighbor, 0)) {
+      const info = getCollisionInfo(nextBlock, neighbor);
+
+      if (info.overlap <= 0) {
         continue;
       }
 
-      const blockCenter = getBlockCenter(nextBlock);
-      const neighborCenter = getBlockCenter(neighbor);
-      const overlapX =
-        Math.min(nextBlock.x + nextBlock.size, neighbor.x + neighbor.size) -
-        Math.max(nextBlock.x, neighbor.x);
-      const overlapY =
-        Math.min(nextBlock.y + nextBlock.size, neighbor.y + neighbor.size) -
-        Math.max(nextBlock.y, neighbor.y);
-
-      if (overlapX < overlapY) {
-        const direction = blockCenter.x >= neighborCenter.x ? 1 : -1;
-        nextBlock.x += direction * (overlapX + 1);
-      } else {
-        const direction = blockCenter.y >= neighborCenter.y ? 1 : -1;
-        nextBlock.y += direction * (overlapY + 1);
-      }
-
+      nextBlock.x -= info.normalX * (info.overlap + 1);
+      nextBlock.y -= info.normalY * (info.overlap + 1);
       nextBlock.x = clamp(nextBlock.x, 0, BOARD_WIDTH - nextBlock.size);
       nextBlock.y = clamp(nextBlock.y, 0, BOARD_HEIGHT - nextBlock.size);
     }
@@ -368,6 +360,60 @@ function collectMergeCandidates(blocks: Block[]) {
   return candidates;
 }
 
+function limitBlockSpeed(block: Block) {
+  block.vx = clamp(block.vx, -MAX_BLOCK_SPEED, MAX_BLOCK_SPEED);
+  block.vy = clamp(block.vy, -MAX_BLOCK_SPEED, MAX_BLOCK_SPEED);
+}
+
+function isBlockSupported(block: Block, blocks: Block[]) {
+  if (block.y + block.size >= BOARD_HEIGHT - 1) {
+    return true;
+  }
+
+  const center = getBlockCenter(block);
+
+  return blocks.some((other) => {
+    if (other.id === block.id) {
+      return false;
+    }
+
+    const otherCenter = getBlockCenter(other);
+
+    if (otherCenter.y <= center.y) {
+      return false;
+    }
+
+    const distance = Math.hypot(otherCenter.x - center.x, otherCenter.y - center.y);
+    const touchDistance = (block.size + other.size) / 2 + 1.5;
+
+    return distance <= touchDistance;
+  });
+}
+
+function settleRestingBlocks(blocks: Block[]) {
+  for (const block of blocks) {
+    limitBlockSpeed(block);
+
+    if (!isBlockSupported(block, blocks)) {
+      continue;
+    }
+
+    block.vx *= STACK_FRICTION;
+
+    if (Math.abs(block.vx) < HORIZONTAL_SLEEP_SPEED) {
+      block.vx = 0;
+    }
+
+    if (Math.abs(block.vy) < RESTING_SPEED) {
+      block.vy = 0;
+    }
+  }
+}
+
+function hasCrossedDangerLine(block: Block) {
+  return !block.isActive && block.y <= DANGER_LINE_Y;
+}
+
 export function createInitialGameState(bestScore = 0): GameState {
   return {
     status: 'start',
@@ -415,9 +461,16 @@ export function setCursorPosition(state: GameState, positionX: number) {
 }
 
 export function canDrop(state: GameState) {
+  const previewBlock = createBlock(
+    -1,
+    state.currentValue,
+    state.cursorX,
+    SPAWN_Y,
+  );
+
   return (
     state.status === 'playing' &&
-    !state.blocks.some((block) => block.isActive && block.y < SPAWN_Y + 84)
+    !state.blocks.some((block) => areBlocksTouching(previewBlock, block, 2))
   );
 }
 
@@ -463,6 +516,7 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
     next.vy += GRAVITY * dt;
     next.vx *= AIR_DRAG;
     next.vy *= AIR_DRAG;
+    limitBlockSpeed(next);
     next.x += next.vx * dt;
     next.y += next.vy * dt;
 
@@ -479,7 +533,7 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
       next.vy = -Math.abs(next.vy) * FLOOR_BOUNCE;
       next.vx *= FRICTION;
 
-      if (Math.abs(next.vy) < 20) {
+      if (Math.abs(next.vy) < RESTING_SPEED) {
         next.vy = 0;
       }
     }
@@ -504,7 +558,7 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
         const first = blocks[index];
         const second = blocks[candidateIndex];
 
-        if (!areBlocksTouching(first, second, -1)) {
+        if (!areBlocksTouching(first, second, 0)) {
           continue;
         }
 
@@ -514,6 +568,8 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
       }
     }
   }
+
+  settleRestingBlocks(blocks);
 
   const merged = mergeBlocks(
     blocks,
@@ -526,9 +582,8 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
   );
 
   const bestScore = Math.max(state.bestScore, merged.score);
-  const warningMs = merged.blocks.some((block) => block.y <= DANGER_LINE_Y)
-    ? state.warningMs + deltaMs
-    : 0;
+  const isGameOver = merged.blocks.some(hasCrossedDangerLine);
+  const warningMs = isGameOver ? GAME_OVER_GRACE_MS : 0;
 
   return {
     ...state,
@@ -540,6 +595,6 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
     nextBlockId: merged.nextBlockId,
     nextEffectId: merged.nextEffectId,
     warningMs,
-    status: warningMs >= GAME_OVER_GRACE_MS ? 'gameOver' : 'playing',
+    status: isGameOver ? 'gameOver' : 'playing',
   };
 }
