@@ -12,32 +12,33 @@ export function getBlockCenter(block: Block) {
   };
 }
 
-export function getBlockRadius(block: Block) {
-  return block.size * 0.44;
-}
-
 export function getCollisionInfo(first: Block, second: Block) {
   const firstCenter = getBlockCenter(first);
   const secondCenter = getBlockCenter(second);
   const dx = secondCenter.x - firstCenter.x;
   const dy = secondCenter.y - firstCenter.y;
   const distance = Math.hypot(dx, dy) || 0.0001;
-  const minDistance = getBlockRadius(first) + getBlockRadius(second);
-  const overlap = minDistance - distance;
+  const overlapX =
+    Math.min(first.x + first.size, second.x + second.size) -
+    Math.max(first.x, second.x);
+  const overlapY =
+    Math.min(first.y + first.size, second.y + second.size) -
+    Math.max(first.y, second.y);
 
   return {
     dx,
     dy,
     distance,
-    minDistance,
-    overlap,
+    overlapX,
+    overlapY,
     normalX: dx / distance,
     normalY: dy / distance,
   };
 }
 
 export function areBlocksTouching(first: Block, second: Block, tolerance = 0) {
-  return getCollisionInfo(first, second).overlap > tolerance;
+  const info = getCollisionInfo(first, second);
+  return info.overlapX > tolerance && info.overlapY > tolerance;
 }
 
 export function areBlocksCloseEnoughToMerge(
@@ -45,26 +46,35 @@ export function areBlocksCloseEnoughToMerge(
   second: Block,
   distanceTolerance = 4,
 ) {
-  const info = getCollisionInfo(first, second);
-  return info.distance <= info.minDistance + distanceTolerance;
+  return (
+    first.x < second.x + second.size + distanceTolerance &&
+    first.x + first.size + distanceTolerance > second.x &&
+    first.y < second.y + second.size + distanceTolerance &&
+    first.y + first.size + distanceTolerance > second.y
+  );
 }
 
 export function resolveBlockCollision(first: Block, second: Block) {
   const info = getCollisionInfo(first, second);
 
-  if (info.overlap <= 0) {
-    return;
+  if (info.overlapX <= 0 || info.overlapY <= 0) {
+    return 0;
   }
 
   const totalSize = first.size + second.size;
   const firstShare = second.size / totalSize;
   const secondShare = first.size / totalSize;
-  const separation = info.overlap + 0.2;
+  const separation = Math.min(info.overlapX, info.overlapY) + 0.4;
 
-  first.x -= info.normalX * separation * firstShare;
-  first.y -= info.normalY * separation * firstShare;
-  second.x += info.normalX * separation * secondShare;
-  second.y += info.normalY * separation * secondShare;
+  if (info.overlapX < info.overlapY) {
+    const direction = info.dx >= 0 ? 1 : -1;
+    first.x -= direction * separation * firstShare;
+    second.x += direction * separation * secondShare;
+  } else {
+    const direction = info.dy >= 0 ? 1 : -1;
+    first.y -= direction * separation * firstShare;
+    second.y += direction * separation * secondShare;
+  }
 
   const relativeVelocityX = second.vx - first.vx;
   const relativeVelocityY = second.vy - first.vy;
@@ -88,4 +98,6 @@ export function resolveBlockCollision(first: Block, second: Block) {
   second.x = clamp(second.x, 0, BOARD_WIDTH - second.size);
   first.y = clamp(first.y, 0, BOARD_HEIGHT - first.size);
   second.y = clamp(second.y, 0, BOARD_HEIGHT - second.size);
+
+  return Math.abs(normalVelocity);
 }

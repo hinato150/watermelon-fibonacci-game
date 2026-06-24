@@ -5,10 +5,12 @@ import {
   COLLISION_PASSES,
   DANGER_LINE_Y,
   FLOOR_BOUNCE,
+  FIBONACCI_GOAL,
   FIBONACCI_START,
   FRICTION,
   GAME_OVER_GRACE_MS,
   GRAVITY,
+  MERGE_TOUCH_TOLERANCE,
   SPAWN_Y,
   WALL_BOUNCE,
   getBlockSize,
@@ -19,7 +21,7 @@ import {
   getBlockCenter,
   resolveBlockCollision,
 } from './collision';
-import type { Block, BlockValue, GameState } from './types';
+import type { Block, BlockValue, Effect, GameState } from './types';
 
 const STARTING_CURSOR_X = BOARD_WIDTH / 2;
 const DEFAULT_CURRENT_VALUE = 1;
@@ -28,6 +30,15 @@ const FIBONACCI_CACHE = [...FIBONACCI_START];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getCursorBounds(value: number) {
+  const halfSize = getBlockSize(value) / 2;
+
+  return {
+    min: halfSize,
+    max: BOARD_WIDTH - halfSize,
+  };
 }
 
 function ensureFibonacciValue(target: number) {
@@ -50,6 +61,10 @@ export function getUnlockedSequence(highestValue: number) {
 }
 
 function getMergePartners(value: number) {
+  if (value === 1) {
+    return [1, 2];
+  }
+
   const index = getFibonacciIndex(value);
 
   if (index === -1) {
@@ -154,7 +169,45 @@ function createBlock(
   };
 }
 
+function separateBlockFromNeighbors(block: Block, neighbors: Block[]) {
+  const nextBlock = { ...block };
+
+  for (let pass = 0; pass < 8; pass += 1) {
+    for (const neighbor of neighbors) {
+      if (!areBlocksTouching(nextBlock, neighbor, 0)) {
+        continue;
+      }
+
+      const blockCenter = getBlockCenter(nextBlock);
+      const neighborCenter = getBlockCenter(neighbor);
+      const overlapX =
+        Math.min(nextBlock.x + nextBlock.size, neighbor.x + neighbor.size) -
+        Math.max(nextBlock.x, neighbor.x);
+      const overlapY =
+        Math.min(nextBlock.y + nextBlock.size, neighbor.y + neighbor.size) -
+        Math.max(nextBlock.y, neighbor.y);
+
+      if (overlapX < overlapY) {
+        const direction = blockCenter.x >= neighborCenter.x ? 1 : -1;
+        nextBlock.x += direction * (overlapX + 1);
+      } else {
+        const direction = blockCenter.y >= neighborCenter.y ? 1 : -1;
+        nextBlock.y += direction * (overlapY + 1);
+      }
+
+      nextBlock.x = clamp(nextBlock.x, 0, BOARD_WIDTH - nextBlock.size);
+      nextBlock.y = clamp(nextBlock.y, 0, BOARD_HEIGHT - nextBlock.size);
+    }
+  }
+
+  return nextBlock;
+}
+
 function canMergeValues(firstValue: number, secondValue: number) {
+  if (firstValue === 1 && secondValue === 1) {
+    return true;
+  }
+
   if (firstValue === secondValue) {
     return false;
   }
@@ -169,19 +222,31 @@ function canMergeValues(firstValue: number, secondValue: number) {
   return Math.abs(firstIndex - secondIndex) === 1;
 }
 
+function getMergedValue(firstValue: number, secondValue: number) {
+  if (firstValue === 1 && secondValue === 1) {
+    return 2;
+  }
+
+  return firstValue + secondValue;
+}
+
 function mergeBlocks(
   blocks: Block[],
   mergeCandidates: Set<string>,
+  effects: Effect[],
   score: number,
   highestValue: BlockValue,
   nextBlockId: number,
+  nextEffectId: number,
 ) {
   const locked = new Set<number>();
   const removed = new Set<number>();
   const nextBlocks = [...blocks];
+  const nextEffects = [...effects];
   let nextScore = score;
   let nextHighestValue = highestValue;
   let nextId = nextBlockId;
+  let effectId = nextEffectId;
 
   for (let index = 0; index < nextBlocks.length; index += 1) {
     const first = nextBlocks[index];
@@ -212,36 +277,58 @@ function mergeBlocks(
       locked.add(first.id);
       locked.add(second.id);
 
-      const mergedValue = first.value + second.value;
+      const mergedValue = getMergedValue(first.value, second.value);
       ensureFibonacciValue(mergedValue);
       const firstCenter = getBlockCenter(first);
       const secondCenter = getBlockCenter(second);
-      const mergedBlock = createBlock(
-        nextId,
-        mergedValue,
-        (firstCenter.x + secondCenter.x) / 2,
-        (firstCenter.y + secondCenter.y) / 2 - getBlockSize(mergedValue) / 2,
-        {
-          vx: (first.vx + second.vx) * 0.18,
-          vy: Math.min(first.vy, second.vy) * 0.12,
-          isActive: false,
-          mergeLockMs: 180,
-        },
+      const effectX = (firstCenter.x + secondCenter.x) / 2;
+      const effectY = (firstCenter.y + secondCenter.y) / 2;
+      const mergedBlock = separateBlockFromNeighbors(
+        createBlock(
+          nextId,
+          mergedValue,
+          effectX,
+          effectY - getBlockSize(mergedValue) / 2,
+          {
+            vx: 0,
+            vy: 0,
+            isActive: false,
+            mergeLockMs: 260,
+          },
+        ),
+        nextBlocks.filter(
+          (block) =>
+            block.id !== first.id &&
+            block.id !== second.id &&
+            !removed.has(block.id),
+        ),
       );
 
       nextId += 1;
       nextScore += mergedValue;
       nextHighestValue = Math.max(nextHighestValue, mergedValue);
       nextBlocks.push(mergedBlock);
+      const isGoalMerge = mergedValue >= FIBONACCI_GOAL;
+      nextEffects.push({
+        id: effectId,
+        x: effectX,
+        y: effectY,
+        size: Math.max(first.size, second.size) * (isGoalMerge ? 1.6 : 1.05),
+        lifeMs: isGoalMerge ? 520 : 320,
+        maxLifeMs: isGoalMerge ? 520 : 320,
+      });
+      effectId += 1;
       break;
     }
   }
 
   return {
     blocks: nextBlocks.filter((block) => !removed.has(block.id)),
+    effects: nextEffects,
     score: nextScore,
     highestValue: nextHighestValue,
     nextBlockId: nextId,
+    nextEffectId: effectId,
   };
 }
 
@@ -269,7 +356,7 @@ function collectMergeCandidates(blocks: Block[]) {
       if (
         second.mergeLockMs > 0 ||
         !canMergeValues(first.value, second.value) ||
-        !areBlocksCloseEnoughToMerge(first, second)
+        !areBlocksCloseEnoughToMerge(first, second, MERGE_TOUCH_TOLERANCE)
       ) {
         continue;
       }
@@ -291,8 +378,10 @@ export function createInitialGameState(bestScore = 0): GameState {
     nextValue: DEFAULT_NEXT_VALUE,
     cursorX: STARTING_CURSOR_X,
     blocks: [],
+    effects: [],
     warningMs: 0,
     nextBlockId: 1,
+    nextEffectId: 1,
   };
 }
 
@@ -308,16 +397,20 @@ export function restartGame(state: GameState) {
 }
 
 export function moveCursor(state: GameState, delta: number) {
+  const bounds = getCursorBounds(state.currentValue);
+
   return {
     ...state,
-    cursorX: clamp(state.cursorX + delta, 28, BOARD_WIDTH - 28),
+    cursorX: clamp(state.cursorX + delta, bounds.min, bounds.max),
   };
 }
 
 export function setCursorPosition(state: GameState, positionX: number) {
+  const bounds = getCursorBounds(state.currentValue);
+
   return {
     ...state,
-    cursorX: clamp(positionX, 28, BOARD_WIDTH - 28),
+    cursorX: clamp(positionX, bounds.min, bounds.max),
   };
 }
 
@@ -358,6 +451,12 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
   }
 
   const dt = Math.min(deltaMs, 32) / 1000;
+  const nextEffects = state.effects
+    .map((effect) => ({
+      ...effect,
+      lifeMs: Math.max(0, effect.lifeMs - deltaMs),
+    }))
+    .filter((effect) => effect.lifeMs > 0);
   const blocks = state.blocks.map((block) => {
     const next = { ...block };
     next.mergeLockMs = Math.max(0, next.mergeLockMs - deltaMs);
@@ -393,6 +492,7 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
   });
 
   const mergeCandidates = collectMergeCandidates(blocks);
+  const nextEffectId = state.nextEffectId;
 
   for (let pass = 0; pass < COLLISION_PASSES; pass += 1) {
     for (let index = 0; index < blocks.length; index += 1) {
@@ -418,9 +518,11 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
   const merged = mergeBlocks(
     blocks,
     mergeCandidates,
+    nextEffects,
     state.score,
     state.highestValue,
     state.nextBlockId,
+    nextEffectId,
   );
 
   const bestScore = Math.max(state.bestScore, merged.score);
@@ -431,10 +533,12 @@ export function updateGameState(state: GameState, deltaMs: number): GameState {
   return {
     ...state,
     blocks: merged.blocks,
+    effects: merged.effects,
     score: merged.score,
     bestScore,
     highestValue: merged.highestValue,
     nextBlockId: merged.nextBlockId,
+    nextEffectId: merged.nextEffectId,
     warningMs,
     status: warningMs >= GAME_OVER_GRACE_MS ? 'gameOver' : 'playing',
   };

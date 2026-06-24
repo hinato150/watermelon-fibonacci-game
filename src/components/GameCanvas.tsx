@@ -1,6 +1,7 @@
 import {
   BOARD_WIDTH,
   DANGER_LINE_Y,
+  FIBONACCI_GOAL,
   GAME_OVER_GRACE_MS,
   MAX_PREVIEW_SEQUENCE,
   SPAWN_Y,
@@ -43,6 +44,7 @@ export function GameCanvas({
   const dropReady = canDrop(gameState);
   const warningRatio = Math.min(gameState.warningMs / GAME_OVER_GRACE_MS, 1);
   const partners = getCurrentPartners(gameState.currentValue);
+  const hasReachedGoal = gameState.highestValue >= FIBONACCI_GOAL;
   const sequence = getUnlockedSequence(gameState.highestValue).slice(
     0,
     MAX_PREVIEW_SEQUENCE,
@@ -83,6 +85,7 @@ export function GameCanvas({
 
       <div className="status-row">
         <span>最大到達: {gameState.highestValue}</span>
+        <span>{hasReachedGoal ? `目標達成: ${FIBONACCI_GOAL}` : `目標: ${FIBONACCI_GOAL}`}</span>
         <span>合体相手: {partners.join(' / ')}</span>
       </div>
 
@@ -94,6 +97,7 @@ export function GameCanvas({
 
       <div
         className="game-board"
+        style={{ width: BOARD_WIDTH, maxWidth: '100%' }}
         onMouseMove={(event) =>
           updateCursorFromClientX(event.clientX, event.currentTarget)
         }
@@ -130,12 +134,30 @@ export function GameCanvas({
               left: block.x,
               top: block.y,
               background: getBlockColor(block.value),
-              fontSize: `clamp(12px, ${Math.max(16, 28 - String(block.value).length * 2)}px, 28px)`,
+              fontSize: `${Math.max(14, Math.min(34, block.size * (String(block.value).length >= 3 ? 0.25 : 0.34)))}px`,
             }}
           >
             {block.value}
           </div>
         ))}
+
+        {gameState.effects.map((effect) => {
+          const opacity = effect.lifeMs / effect.maxLifeMs;
+          return (
+            <div
+              key={effect.id}
+              className="merge-effect"
+              style={{
+                left: effect.x - effect.size / 2,
+                top: effect.y - effect.size / 2,
+                width: effect.size,
+                height: effect.size,
+                opacity,
+                transform: `scale(${1 + (1 - opacity) * 0.9})`,
+              }}
+            />
+          );
+        })}
 
         <div
           className={`drop-hint${dropReady ? ' is-ready' : ''}`}

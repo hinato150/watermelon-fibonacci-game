@@ -14,6 +14,15 @@ export type Block = {
   mergeLockMs: number;
 };
 
+export type Effect = {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  lifeMs: number;
+  maxLifeMs: number;
+};
+
 export type GameState = {
   status: GameStatus;
   score: number;
@@ -23,6 +32,8 @@ export type GameState = {
   nextValue: BlockValue;
   cursorX: number;
   blocks: Block[];
+  effects: Effect[];
   warningMs: number;
   nextBlockId: number;
+  nextEffectId: number;
 };

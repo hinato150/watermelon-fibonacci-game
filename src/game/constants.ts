@@ -11,20 +11,23 @@ export const FRICTION = 0.985;
 export const AIR_DRAG = 0.996;
 export const CURSOR_STEP = 28;
 export const COLLISION_RESTITUTION = 0.18;
-export const COLLISION_PASSES = 3;
+export const COLLISION_PASSES = 6;
+export const MERGE_TOUCH_TOLERANCE = 8;
 
 export const FIBONACCI_START = [1, 2, 3, 5, 8, 13, 21, 34];
+export const FIBONACCI_GOAL = 144;
 export const MAX_PREVIEW_SEQUENCE = 8;
 
 export function getBlockSize(value: number) {
-  const index = Math.max(0, Math.round(Math.log(value) / Math.log(1.618)));
-  return Math.min(98, 44 + index * 4);
+  return Math.min(152, (8 + value) * 2);
 }
 
 export function getBlockColor(value: number) {
-  const hue = Math.min(48, 146 - Math.round(Math.log(value + 1) * 18));
-  const saturation = Math.min(78, 52 + Math.round(Math.log(value + 1) * 6));
-  const lightness = Math.max(48, 78 - Math.round(Math.log(value + 1) * 5));
+  const neonHues = [184, 104, 54, 31, 331, 204, 146, 48, 312, 174, 22];
+  const index = Math.max(0, Math.round(Math.log(value) / Math.log(1.618)));
+  const hue = neonHues[index % neonHues.length];
+  const saturation = 92;
+  const lightness = Math.max(52, 68 - index * 2);
 
   return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
